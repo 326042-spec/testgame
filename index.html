@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>German Vocabulary Quest</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #1e1b4b, #312e81, #4c1d95);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: white;
+            overflow: hidden; /* スクロール防止 */
+            touch-action: manipulation; /* ダブルタップズーム防止 */
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* アニメーション関連 */
+        .shake { animation: shake 0.5s; }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .attack-player { animation: attackPlayer 0.3s ease-in-out; }
+        @keyframes attackPlayer {
+            0% { transform: translateX(0) scale(1); }
+            50% { transform: translateX(30px) scale(1.2); }
+            100% { transform: translateX(0) scale(1); }
+        }
+
+        .attack-enemy { animation: attackEnemy 0.3s ease-in-out; }
+        @keyframes attackEnemy {
+            0% { transform: translateX(0) scale(1); }
+            50% { transform: translateX(-30px) scale(1.2); }
+            100% { transform: translateX(0) scale(1); }
+        }
+
+        .damage-text {
+            position: absolute;
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ef4444; /* red-500 */
+            text-shadow: 2px 2px 0 #000;
+            animation: floatUp 1s ease-out forwards;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .heal-text {
+            color: #22c55e; /* green-500 */
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.5); }
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .bar-transition {
+            transition: width 0.3s ease-in-out, background-color 0.3s ease;
+        }
+
+        /* 選択肢ボタンのホバー・クリックエフェクト */
+        .option-btn {
+            transition: all 0.2s;
+        }
+        .option-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
+        }
+        .option-btn:active {
+            transform: translateY(1px);
+        }
+        .option-correct { background-color: #22c55e !important; color: white !important; border-color: #22c55e !important; }
+        .option-wrong { background-color: #ef4444 !important; color: white !important; border-color: #ef4444 !important; }
+
+        /* 絵文字キャラクター */
+        .character {
+            font-size: 5rem;
+            filter: drop-shadow(0 10px 8px rgb(0 0 0 / 0.5));
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex items-center justify-center">
+
+    <!-- ゲームコンテナ -->
+    <div id="game-container" class="relative w-full max-w-md h-full max-h-[850px] glass-panel sm:rounded-3xl flex flex-col p-4 sm:p-6 shadow-2xl">
+        
+        <!-- スタート画面 -->
+        <div id="screen-start" class="absolute inset-0 flex flex-col items-center justify-center p-6 z-20 glass-panel sm:rounded-3xl">
+            <div class="text-7xl mb-6 animate-bounce">🇩🇪</div>
+            <h1 class="text-4xl font-extrabold text-center mb-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-500">
+                German<br>Quest
+            </h1>
+            <p class="text-gray-300 text-center mb-8">ドイツ語の単語を答えてモンスターを倒そう！</p>
+            <button onclick="startGame()" class="w-full py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 rounded-xl font-bold text-xl shadow-lg transition-transform transform hover:scale-105 active:scale-95">
+                ゲームスタート
+            </button>
+        </div>
+
+        <!-- プレイ画面 -->
+        <div id="screen-play" class="flex flex-col h-full hidden opacity-0 transition-opacity duration-500">
+            <!-- トップ情報バー -->
+            <div class="flex justify-between items-center mb-4 text-sm font-bold bg-black/30 p-3 rounded-xl">
+                <div>STAGE: <span id="stage-display" class="text-yellow-400">1</span></div>
+                <div>SCORE: <span id="score-display" class="text-green-400">0</span></div>
+            </div>
+
+            <!-- バトルエリア -->
+            <div class="flex justify-between items-end mb-6 flex-1 px-2 relative" id="battle-area">
+                <!-- プレイヤー -->
+                <div class="flex flex-col items-center w-5/12 relative">
+                    <div class="w-full bg-gray-700 rounded-full h-3 mb-2 border border-gray-500">
+                        <div id="player-hp-bar" class="bg-green-500 h-3 rounded-full bar-transition" style="width: 100%"></div>
+                    </div>
+                    <div class="text-xs mb-1 font-bold">You (HP: <span id="player-hp-text">100</span>)</div>
+                    <div id="player-char" class="character">🧙‍♂️</div>
+                </div>
+                
+                <div class="text-2xl font-bold text-gray-400 pb-8">VS</div>
+
+                <!-- 敵 -->
+                <div class="flex flex-col items-center w-5/12 relative">
+                    <div class="w-full bg-gray-700 rounded-full h-3 mb-2 border border-gray-500">
+                        <div id="enemy-hp-bar" class="bg-red-500 h-3 rounded-full bar-transition" style="width: 100%"></div>
+                    </div>
+                    <div class="text-xs mb-1 font-bold">Enemy (HP: <span id="enemy-hp-text">100</span>)</div>
+                    <div id="enemy-char" class="character">👹</div>
+                </div>
+            </div>
+
+            <!-- タイムバー -->
+            <div class="w-full bg-gray-700 rounded-full h-1.5 mb-4">
+                <div id="time-bar" class="bg-blue-400 h-1.5 rounded-full" style="width: 100%; transition: width 0.1s linear;"></div>
+            </div>
+
+            <!-- クイズエリア -->
+            <div class="bg-white/10 rounded-2xl p-4 flex flex-col items-center border border-white/20 shadow-inner">
+                <div class="text-sm text-gray-300 mb-1">この日本語はドイツ語で？</div>
+                <div id="question-text" class="text-3xl font-extrabold mb-4 text-center min-h-[40px]">
+                    <!-- 問題文 -->
+                </div>
+                
+                <!-- 選択肢グリッド -->
+                <div class="grid grid-cols-2 gap-3 w-full" id="options-container">
+                    <!-- ボタンはJSで生成 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ゲームオーバー / クリア画面 -->
+        <div id="screen-end" class="absolute inset-0 flex flex-col items-center justify-center p-6 z-30 glass-panel sm:rounded-3xl hidden opacity-0 transition-opacity duration-500">
+            <div id="end-icon" class="text-7xl mb-4">💀</div>
+            <h2 id="end-title" class="text-4xl font-bold mb-2 text-center text-red-400">GAME OVER</h2>
+            <p id="end-message" class="text-lg text-gray-300 mb-6 text-center">勇者は倒れた...</p>
+            
+            <div class="bg-black/40 p-4 rounded-xl w-full mb-8 text-center border border-white/10">
+                <div class="text-sm text-gray-400">最終スコア</div>
+                <div id="final-score" class="text-4xl font-extrabold text-yellow-400">0</div>
+                <div class="text-sm text-gray-400 mt-2">到達ステージ</div>
+                <div id="final-stage" class="text-2xl font-bold text-white">1</div>
+            </div>
+
+            <button onclick="resetGame()" class="w-full py-4 bg-white text-indigo-900 rounded-xl font-bold text-xl shadow-lg transition-transform transform hover:scale-105 active:scale-95">
+                もう一度挑戦する
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // ドイツ語単語リスト (ジャンル別に少しずつ難易度を上げるために利用可能ですが、今回はランダム出題)
+        const vocabList = [
+            { ja: "犬", de: "Hund" },
+            { ja: "猫", de: "Katze" },
+            { ja: "水", de: "Wasser" },
+            { ja: "パン", de: "Brot" },
+            { ja: "リンゴ", de: "Apfel" },
+            { ja: "家", de: "Haus" },
+            { ja: "車", de: "Auto" },
+            { ja: "本", de: "Buch" },
+            { ja: "太陽", de: "Sonne" },
+            { ja: "月", de: "Mond" },
+            { ja: "男", de: "Mann" },
+            { ja: "女", de: "Frau" },
+            { ja: "子供", de: "Kind" },
+            { ja: "友達", de: "Freund" },
+            { ja: "時間", de: "Zeit" },
+            { ja: "日", de: "Tag" },
+            { ja: "夜", de: "Nacht" },
+            { ja: "朝", de: "Morgen" },
+            { ja: "赤", de: "rot" },
+            { ja: "青", de: "blau" },
+            { ja: "大きい", de: "groß" },
+            { ja: "小さい", de: "klein" },
+            { ja: "新しい", de: "neu" },
+            { ja: "古い", de: "alt" },
+            { ja: "食べる", de: "essen" },
+            { ja: "飲む", de: "trinken" },
+            { ja: "行く", de: "gehen" },
+            { ja: "来る", de: "kommen" },
+            { ja: "見る", de: "sehen" },
+            { ja: "こんにちは", de: "Hallo" },
+            { ja: "ありがとう", de: "Danke" },
+            { ja: "はい", de: "Ja" },
+            { ja: "いいえ", de: "Nein" },
+            { ja: "さようなら", de: "Tschüss" },
+            { ja: "愛", de: "Liebe" },
+            { ja: "お金", de: "Geld" },
+            { ja: "仕事", de: "Arbeit" },
+            { ja: "街", de: "Stadt" },
+            { ja: "国", de: "Land" },
+            { ja: "美しい", de: "schön" }
+        ];
+
+        // 敵キャラクターリスト（ステージごとに変更）
+        const enemies = ["👹", "👺", "👻", "👽", "👾", "🤖", "🎃", "🧛‍♂️", "🧟‍♂️", "🐉"];
+
+        // ゲーム状態
+        let state = {
+            stage: 1,
+            score: 0,
+            playerMaxHP: 100,
+            playerHP: 100,
+            enemyMaxHP: 100,
+            enemyHP: 100,
+            currentQuestion: null,
+            options: [],
+            isAnswering: false,
+            timer: null,
+            timeLeft: 10,
+            maxTime: 10
+        };
+
+        // DOM要素
+        const screens = {
+            start: document.getElementById('screen-start'),
+            play: document.getElementById('screen-play'),
+            end: document.getElementById('screen-end')
+        };
+        const UI = {
+            stage: document.getElementById('stage-display'),
+            score: document.getElementById('score-display'),
+            playerHpBar: document.getElementById('player-hp-bar'),
+            playerHpText: document.getElementById('player-hp-text'),
+            enemyHpBar: document.getElementById('enemy-hp-bar'),
+            enemyHpText: document.getElementById('enemy-hp-text'),
+            playerChar: document.getElementById('player-char'),
+            enemyChar: document.getElementById('enemy-char'),
+            timeBar: document.getElementById('time-bar'),
+            questionText: document.getElementById('question-text'),
+            optionsContainer: document.getElementById('options-container'),
+            battleArea: document.getElementById('battle-area')
+        };
+
+        // ユーティリティ: 配列のシャッフル
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // ゲーム開始
+        function startGame() {
+            screens.start.classList.add('hidden');
+            screens.play.classList.remove('hidden');
+            // 少し遅らせてopacityを上げる（フェードイン）
+            setTimeout(() => {
+                screens.play.classList.remove('opacity-0');
+            }, 50);
+            
+            resetGame();
+        }
+
+        // ゲームリセット（初期化）
+        function resetGame() {
+            screens.end.classList.add('hidden');
+            screens.end.classList.add('opacity-0');
+            screens.play.classList.remove('hidden');
+            setTimeout(() => {
+                screens.play.classList.remove('opacity-0');
+            }, 50);
+            
+            state = {
+                stage: 1,
+                score: 0,
+                playerMaxHP: 100,
+                playerHP: 100,
+                enemyMaxHP: 100, // ステージが上がると増える
+                enemyHP: 100,
+                currentQuestion: null,
+                options: [],
+                isAnswering: false,
+                timer: null,
+                timeLeft: 10,
+                maxTime: 10
+            };
+
+            updateHPUI();
+            updateScoreUI();
+            UI.enemyChar.textContent = enemies[0];
+            
+            nextQuestion();
+        }
+
+        // 次の問題をセット
+        function nextQuestion() {
+            state.isAnswering = false;
+            
+            // 正解を選択
+            const correctVocab = vocabList[Math.floor(Math.random() * vocabList.length)];
+            state.currentQuestion = correctVocab;
+
+            // 不正解の選択肢を3つ選ぶ
+            let wrongOptions = vocabList.filter(v => v.de !== correctVocab.de);
+            wrongOptions = shuffleArray(wrongOptions).slice(0, 3);
+
+            // 選択肢をまとめる
+            state.options = [correctVocab, ...wrongOptions];
+            state.options = shuffleArray(state.options);
+
+            // UI更新
+            UI.questionText.textContent = correctVocab.ja;
+            UI.optionsContainer.innerHTML = '';
+            
+            state.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn w-full bg-white/10 border border-white/30 text-white font-semibold py-4 px-2 rounded-xl text-lg sm:text-xl break-words focus:outline-none';
+                btn.textContent = opt.de;
+                btn.onclick = () => selectAnswer(opt.de, btn);
+                UI.optionsContainer.appendChild(btn);
+            });
+
+            startTimer();
+        }
+
+        // タイマー開始
+        function startTimer() {
+            clearInterval(state.timer);
+            // ステージが上がると制限時間が少し短くなる（最小4秒）
+            state.maxTime = Math.max(4, 10 - (state.stage * 0.5));
+            state.timeLeft = state.maxTime;
+            
+            UI.timeBar.style.width = '100%';
+            UI.timeBar.className = 'bg-blue-400 h-1.5 rounded-full';
+
+            state.timer = setInterval(() => {
+                state.timeLeft -= 0.1;
+                const percentage = (state.timeLeft / state.maxTime) * 100;
+                UI.timeBar.style.width = `${percentage}%`;
+
+                if (percentage < 30) {
+                    UI.timeBar.className = 'bg-red-500 h-1.5 rounded-full'; // ピンチで赤く
+                }
+
+                if (state.timeLeft <= 0) {
+                    clearInterval(state.timer);
+                    timeUp();
+                }
+            }, 100);
+        }
+
+        // 時間切れ
+        function timeUp() {
+            if(state.isAnswering) return;
+            state.isAnswering = true;
+            
+            // 正解をハイライト
+            const buttons = UI.optionsContainer.querySelectorAll('button');
+            buttons.forEach(btn => {
+                if(btn.textContent === state.currentQuestion.de) {
+                    btn.classList.add('option-correct');
+                } else {
+                    btn.classList.add('opacity-50');
+                }
+            });
+
+            handleWrongAnswer();
+        }
+
+        // 解答選択
+        function selectAnswer(selectedDe, btnElement) {
+            if (state.isAnswering) return;
+            state.isAnswering = true;
+            clearInterval(state.timer);
+
+            const isCorrect = selectedDe === state.currentQuestion.de;
+            const buttons = UI.optionsContainer.querySelectorAll('button');
+
+            buttons.forEach(btn => {
+                if (btn.textContent === state.currentQuestion.de) {
+                    btn.classList.add('option-correct'); // 正解は常に緑
+                } else if (btn === btnElement && !isCorrect) {
+                    btn.classList.add('option-wrong'); // 選んだ間違いは赤
+                } else {
+                    btn.classList.add('opacity-50'); // その他は薄く
+                }
+                btn.disabled = true;
+            });
+
+            if (isCorrect) {
+                handleCorrectAnswer();
+            } else {
+                handleWrongAnswer();
+            }
+        }
+
+        // 正解時の処理
+        function handleCorrectAnswer() {
+            // スコア加算 (残り時間ボーナスあり)
+            const timeBonus = Math.floor((state.timeLeft / state.maxTime) * 50);
+            state.score += (100 + timeBonus);
+            updateScoreUI();
+
+            // プレイヤー攻撃アニメーション
+            UI.playerChar.classList.add('attack-player');
+            
+            setTimeout(() => {
+                UI.playerChar.classList.remove('attack-player');
+                
+                // 敵にダメージ
+                const damage = 20 + Math.floor(Math.random() * 10);
+                state.enemyHP -= damage;
+                showFloatingText(UI.enemyChar, `-${damage}`);
+                
+                // 敵が揺れる
+                UI.enemyChar.classList.add('shake');
+                setTimeout(() => UI.enemyChar.classList.remove('shake'), 500);
+                
+                updateHPUI();
+                
+                setTimeout(() => {
+                    if (state.enemyHP <= 0) {
+                        stageClear();
+                    } else {
+                        nextQuestion();
+                    }
+                }, 1000);
+            }, 150); // アニメーションの途中でダメージ発生
+        }
+
+        // 不正解時の処理
+        function handleWrongAnswer() {
+            // 敵攻撃アニメーション
+            UI.enemyChar.classList.add('attack-enemy');
+            
+            setTimeout(() => {
+                UI.enemyChar.classList.remove('attack-enemy');
+                
+                // プレイヤーにダメージ (ステージが上がると痛い)
+                const damage = 15 + (state.stage * 5) + Math.floor(Math.random() * 10);
+                state.playerHP -= damage;
+                showFloatingText(UI.playerChar, `-${damage}`);
+                
+                // 画面全体を揺らす
+                document.body.classList.add('shake');
+                UI.playerChar.classList.add('shake');
+                setTimeout(() => {
+                    document.body.classList.remove('shake');
+                    UI.playerChar.classList.remove('shake');
+                }, 500);
+
+                updateHPUI();
+
+                setTimeout(() => {
+                    if (state.playerHP <= 0) {
+                        gameOver();
+                    } else {
+                        nextQuestion();
+                    }
+                }, 1500); // 答えを確認する余裕を持たせるために少し長く待つ
+            }, 150);
+        }
+
+        // ステージクリア処理
+        function stageClear() {
+            state.stage++;
+            state.score += 500; // ボス撃破ボーナス
+            
+            // 敵強化
+            state.enemyMaxHP = 100 + (state.stage * 20);
+            state.enemyHP = state.enemyMaxHP;
+            
+            // プレイヤー回復
+            const heal = 30;
+            state.playerHP = Math.min(state.playerMaxHP, state.playerHP + heal);
+            showFloatingText(UI.playerChar, `+${heal}`, true);
+
+            // 敵キャラ変更
+            const enemyIndex = (state.stage - 1) % enemies.length;
+            UI.enemyChar.textContent = enemies[enemyIndex];
+            
+            // エフェクト
+            UI.enemyChar.style.transform = "scale(0)";
+            UI.enemyChar.style.transition = "transform 0.5s";
+            
+            setTimeout(() => {
+                updateHPUI();
+                updateScoreUI();
+                UI.enemyChar.style.transform = "scale(1)";
+                
+                // ステージ表示アニメーション
+                UI.stage.parentElement.classList.add('shake');
+                setTimeout(() => UI.stage.parentElement.classList.remove('shake'), 500);
+                
+                nextQuestion();
+            }, 600);
+        }
+
+        // ゲームオーバー処理
+        function gameOver() {
+            clearInterval(state.timer);
+            
+            setTimeout(() => {
+                screens.play.classList.add('opacity-0');
+                
+                setTimeout(() => {
+                    screens.play.classList.add('hidden');
+                    screens.end.classList.remove('hidden');
+                    
+                    document.getElementById('final-score').textContent = state.score;
+                    document.getElementById('final-stage').textContent = state.stage;
+                    
+                    // 結果に応じたメッセージ
+                    const title = document.getElementById('end-title');
+                    const msg = document.getElementById('end-message');
+                    const icon = document.getElementById('end-icon');
+                    
+                    if (state.stage >= 10) {
+                        title.textContent = "WUNDERBAR!";
+                        title.className = "text-4xl font-bold mb-2 text-center text-yellow-400";
+                        msg.textContent = "素晴らしい！ドイツ語マスターへの道は開かれた！";
+                        icon.textContent = "👑";
+                    } else if (state.stage >= 5) {
+                        title.textContent = "SEHR GUT!";
+                        title.className = "text-4xl font-bold mb-2 text-center text-blue-400";
+                        msg.textContent = "よく頑張った！語彙力が確実についているぞ。";
+                        icon.textContent = "👏";
+                    } else {
+                        title.textContent = "GAME OVER";
+                        title.className = "text-4xl font-bold mb-2 text-center text-red-400";
+                        msg.textContent = "基本から少しずつ覚えていこう！";
+                        icon.textContent = "💀";
+                    }
+
+                    setTimeout(() => {
+                        screens.end.classList.remove('opacity-0');
+                    }, 50);
+                }, 500);
+            }, 500);
+        }
+
+        // UI更新：HP
+        function updateHPUI() {
+            // Player
+            state.playerHP = Math.max(0, state.playerHP);
+            const pRatio = (state.playerHP / state.playerMaxHP) * 100;
+            UI.playerHpBar.style.width = `${pRatio}%`;
+            UI.playerHpText.textContent = state.playerHP;
+            
+            if (pRatio > 50) UI.playerHpBar.className = 'bg-green-500 h-3 rounded-full bar-transition';
+            else if (pRatio > 20) UI.playerHpBar.className = 'bg-yellow-500 h-3 rounded-full bar-transition';
+            else UI.playerHpBar.className = 'bg-red-500 h-3 rounded-full bar-transition';
+
+            // Enemy
+            state.enemyHP = Math.max(0, state.enemyHP);
+            const eRatio = (state.enemyHP / state.enemyMaxHP) * 100;
+            UI.enemyHpBar.style.width = `${eRatio}%`;
+            UI.enemyHpText.textContent = state.enemyHP;
+            // 敵は常に赤いバー
+        }
+
+        // UI更新：スコアとステージ
+        function updateScoreUI() {
+            UI.score.textContent = state.score;
+            UI.stage.textContent = state.stage;
+        }
+
+        // ダメージ等のフローティングテキスト表示
+        function showFloatingText(targetElement, text, isHeal = false) {
+            const el = document.createElement('div');
+            el.className = `damage-text ${isHeal ? 'heal-text' : ''}`;
+            el.textContent = text;
+            
+            // targetElementの中心付近に配置
+            const rect = targetElement.getBoundingClientRect();
+            const containerRect = UI.battleArea.getBoundingClientRect();
+            
+            const x = rect.left - containerRect.left + (rect.width / 2) - 20; // 微調整
+            const y = rect.top - containerRect.top;
+
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+            
+            UI.battleArea.appendChild(el);
+            
+            setTimeout(() => {
+                el.remove();
+            }, 1000);
+        }
+
+    </script>
+</body>
+</html>
